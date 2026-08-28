@@ -2,6 +2,8 @@
 
 ## 序
 
+![Jang-Ji-Yargar](./Jang-Ji-Yargar.png)
+
 > 遥か昔。  
 > 遠い宇宙の、遥か彼方。  
 > 名も残らぬ国々が争った時代。
