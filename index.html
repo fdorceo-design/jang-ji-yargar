@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ジャンジャガ</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+  <h1>ジャンジャガ</h1>
+
+  <div class="turn-bar">
+    <div id="turn-avatar" class="turn-avatar"></div>
+    <div class="turn-text">
+      <div id="turn-text"></div>
+      <div id="turn-phase" class="phase"></div>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <img class="board-layer" src="assets/board/board_jjy_zzg_5x5_base_01.png" alt="" />
+    <img class="board-layer" src="assets/board/board_grid_5x5_gold_01.png" alt="" />
+    <div id="board-grid" class="board-grid-overlay"></div>
+  </div>
+
+  <div id="tray" class="tray"></div>
+
+  <div class="controls">
+    <button id="skip-challenge-btn" class="hidden">挑戦しない</button>
+    <button id="pass-btn" class="hidden">手番を相手に渡す</button>
+  </div>
+
+  <div id="log" class="log"></div>
+</div>
+
+<div id="win-banner" class="win-banner hidden">
+  <div id="win-avatar" class="avatar"></div>
+  <h2 id="win-text"></h2>
+</div>
+
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
