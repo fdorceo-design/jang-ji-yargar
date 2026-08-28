@@ -1,5 +1,5 @@
 (function () {
-const { createGame, canPlace, placeUnit, placementChallenge, skipPlacementChallenge, selectUnit, clearSelection, moveUnit, challengeUnit, passSegment, ROCK_MAX } = window.JangJiYargar;
+const { createGame, canPlace, placeUnit, selectUnit, clearSelection, moveUnit, challengeUnit, passSegment, ROCK_MAX } = window.JangJiYargar;
 
 const NAMES = { jjy: "Jang-Ji-Yargar", zzg: "Zung-Zoo-Gar" };
 const TYPE_LABELS = { rock: "グー", scissors: "チョキ", paper: "パー" };
@@ -13,7 +13,6 @@ const trayEl = document.getElementById("tray");
 const turnAvatarEl = document.getElementById("turn-avatar");
 const turnTextEl = document.getElementById("turn-text");
 const turnPhaseEl = document.getElementById("turn-phase");
-const skipBtn = document.getElementById("skip-challenge-btn");
 const passBtn = document.getElementById("pass-btn");
 const logEl = document.getElementById("log");
 const winBanner = document.getElementById("win-banner");
@@ -60,14 +59,13 @@ function buildTray() {
 }
 
 function handleTraySlotClick(type) {
-  if (game.phase !== "placement" || game.activePlayer !== game.turnOwner) return;
   if (!canPlace(game, type)) return;
   uiSelectedTrayType = uiSelectedTrayType === type ? null : type;
   render();
 }
 
 function handleTrayDragStart(e, type) {
-  if (game.phase !== "placement" || !canPlace(game, type)) {
+  if (!canPlace(game, type)) {
     e.preventDefault();
     return;
   }
@@ -103,11 +101,6 @@ function handleDrop(e, r, c) {
 
 function handleCellClick(r, c) {
   if (game.phase === "placement") {
-    if (cellHas(game.pendingChallengeTargets, r, c)) {
-      placementChallenge(game, r, c);
-      render();
-      return;
-    }
     if (uiSelectedTrayType && game.board[r][c] === null) {
       const res = placeUnit(game, uiSelectedTrayType, r, c);
       if (res.ok) uiSelectedTrayType = null;
@@ -138,11 +131,6 @@ function handleCellClick(r, c) {
     render();
   }
 }
-
-skipBtn.addEventListener("click", () => {
-  skipPlacementChallenge(game);
-  render();
-});
 
 passBtn.addEventListener("click", () => {
   passSegment(game);
@@ -177,11 +165,8 @@ function render() {
       }
 
       if (game.phase === "placement") {
-        if (uiSelectedTrayType && boardCell === null && !game.placedPos) {
+        if (uiSelectedTrayType && boardCell === null) {
           cellEl.classList.add("highlight-place");
-        }
-        if (cellHas(game.pendingChallengeTargets, r, c)) {
-          cellEl.classList.add("highlight-challenge");
         }
       } else if (game.phase === "segment") {
         if (game.selected && game.selected[0] === r && game.selected[1] === c) {
@@ -194,7 +179,7 @@ function render() {
   }
 
   // tray
-  const trayActive = game.phase === "placement" && game.activePlayer === game.turnOwner;
+  const trayActive = game.phase === "placement";
   for (const slot of trayEl.children) {
     const type = slot.dataset.type;
     const icon = slot.querySelector(".unit-icon");
@@ -206,22 +191,20 @@ function render() {
     } else {
       countEl.textContent = "∞";
     }
-    const enabled = trayActive && canPlace(game, type) && !game.placedPos;
+    const enabled = trayActive && canPlace(game, type);
     slot.classList.toggle("disabled", !enabled);
     slot.classList.toggle("selected", uiSelectedTrayType === type);
   }
 
   // turn bar
-  const owner = game.phase === "placement" ? game.turnOwner : game.activePlayer;
+  const owner = game.activePlayer;
   turnAvatarEl.className = `turn-avatar ${owner}`;
   turnAvatarEl.style.backgroundImage = `url('assets/markers/marker_${owner}_win_01.png')`;
   turnTextEl.textContent = `ターン${game.turnNumber} — ${NAMES[owner]}陣営`;
   if (game.phase === "placement") {
     const remainingPlacements = game.placementQuota - game.placementsDone;
     const quotaNote = game.placementQuota > 1 ? `（あと${remainingPlacements}体）` : "";
-    turnPhaseEl.textContent = game.placedPos
-      ? "第1セグメント：配置後の挑戦を選択"
-      : `第1セグメント：ユニットを配置してください${quotaNote}`;
+    turnPhaseEl.textContent = `配置：ユニットを配置してください${quotaNote}`;
   } else if (game.phase === "segment") {
     turnPhaseEl.textContent = "通常セグメント：移動・挑戦、または相手へ渡す";
   } else if (game.phase === "ended") {
@@ -229,7 +212,6 @@ function render() {
   }
 
   // buttons
-  skipBtn.classList.toggle("hidden", !(game.phase === "placement" && game.pendingChallengeTargets.length > 0));
   passBtn.classList.toggle("hidden", game.phase !== "segment");
 
   // log

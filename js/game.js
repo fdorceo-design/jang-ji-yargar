@@ -44,16 +44,18 @@ function createGame() {
     },
     turnOwner: "jjy",
     turnNumber: 1,
-    // phase: 'placement' (第1セグメント) | 'segment' (通常セグメント) | 'ended'
+    // phase: 'placement' (配置) | 'segment' (通常セグメント) | 'ended'
     phase: "placement",
     activePlayer: "jjy",
-    placedPos: null,
-    pendingChallengeTargets: [],
     selected: null,
     moveTargets: [],
     challengeTargets: [],
     segmentActionCount: 0,
     prevSegmentEndedEmpty: false,
+    // このターンに配置したユニットの座標。ターン担当者の最初の通常セグメントの間だけ、移動不可・挑戦は最大1回の制限を受ける
+    restrictedUnitPos: null,
+    restrictedUnitChallenged: false,
+    turnOwnerSegmentCount: 0,
     winner: null,
     winLine: null,
     log: [],
@@ -81,19 +83,30 @@ function startTurn(state) {
   state.activePlayer = state.turnOwner;
   state.placementQuota = state.turnNumber === 1 ? 2 : 1;
   state.placementsDone = 0;
-  state.placedPos = null;
-  state.pendingChallengeTargets = [];
   state.selected = null;
   state.moveTargets = [];
   state.challengeTargets = [];
   state.segmentActionCount = 0;
   state.prevSegmentEndedEmpty = false;
+  state.restrictedUnitPos = null;
+  state.restrictedUnitChallenged = false;
+  state.turnOwnerSegmentCount = 0;
   pushLog(state, `--- ターン${state.turnNumber}: ${state.turnOwner} の配置番 ---`);
+}
+
+// r,c のユニットが「配置直後のターン担当者の最初の通常セグメント」の制限下にあるか
+function isRestricted(state, r, c) {
+  return (
+    state.turnOwnerSegmentCount === 1 &&
+    state.activePlayer === state.turnOwner &&
+    !!state.restrictedUnitPos &&
+    state.restrictedUnitPos[0] === r &&
+    state.restrictedUnitPos[1] === c
+  );
 }
 
 function canPlace(state, type) {
   if (state.phase !== "placement") return false;
-  if (state.placedPos !== null) return false;
   if (type === "rock" && state.players[state.activePlayer].rockUsed >= ROCK_MAX) return false;
   return true;
 }
@@ -140,56 +153,36 @@ function placeUnit(state, type, r, c) {
   const owner = state.activePlayer;
   state.board[r][c] = { kind: "unit", owner, type };
   if (type === "rock") state.players[owner].rockUsed += 1;
-  state.placedPos = [r, c];
   state.placementsDone += 1;
   pushLog(state, `${owner} が ${type} を (${r},${c}) へ配置`);
 
-  const targets = challengeTargetsFrom(state, r, c, owner, type);
-  state.pendingChallengeTargets = targets;
-  if (targets.length === 0) {
-    advanceOrEndPlacement(state);
-  }
-  return { ok: true };
-}
-
-function placementChallenge(state, tr, tc) {
-  if (state.phase !== "placement" || !state.placedPos) return { ok: false, reason: "対象外です" };
-  const found = state.pendingChallengeTargets.some(([r, c]) => r === tr && c === tc);
-  if (!found) return { ok: false, reason: "挑戦できません" };
-  const [r, c] = state.placedPos;
-  resolveChallenge(state, r, c, tr, tc);
-  if (state.winner) return { ok: true };
-  advanceOrEndPlacement(state);
-  return { ok: true };
-}
-
-function skipPlacementChallenge(state) {
-  if (state.phase !== "placement") return { ok: false, reason: "対象外です" };
-  advanceOrEndPlacement(state);
-  return { ok: true };
-}
-
-// 配置番の残り数に応じて、続けて配置させるかセグメントを終えるかを決める
-function advanceOrEndPlacement(state) {
   if (state.placementsDone < state.placementQuota) {
-    state.placedPos = null;
-    state.pendingChallengeTargets = [];
-    return;
+    // 第1ターンの2体目待ち：引き続き配置番のまま
+    return { ok: true };
   }
-  endPlacementPhase(state);
+
+  if (state.turnNumber === 1) {
+    // 第1ターンは2体配置したら即終了（敵ユニットが存在しないため挑戦は発生しない）
+    endTurn(state);
+  } else {
+    // 配置直後から、配置したプレイヤー自身の通常セグメントが始まる
+    state.restrictedUnitPos = [r, c];
+    state.restrictedUnitChallenged = false;
+    enterSegment(state, state.turnOwner);
+  }
+  return { ok: true };
 }
 
-function endPlacementPhase(state) {
+// セグメントを開始する。行動可能な手が一つも無ければ、宣言したものとして自動的に相手へ渡す
+function enterSegment(state, player) {
   state.phase = "segment";
-  state.activePlayer = otherPlayer(state.turnOwner);
-  state.placedPos = null;
-  state.pendingChallengeTargets = [];
-  state.selected = null;
-  state.moveTargets = [];
-  state.challengeTargets = [];
+  state.activePlayer = player;
   state.segmentActionCount = 0;
-  state.prevSegmentEndedEmpty = false;
-  checkAutoEndTurn(state);
+  if (player === state.turnOwner) state.turnOwnerSegmentCount += 1;
+  clearSelection(state);
+  if (!hasAnyAction(state, player)) {
+    passSegment(state);
+  }
 }
 
 function selectUnit(state, r, c) {
@@ -202,8 +195,13 @@ function selectUnit(state, r, c) {
     return { ok: false };
   }
   state.selected = [r, c];
-  state.moveTargets = moveTargetsFrom(state, r, c, cell.owner, cell.type);
-  state.challengeTargets = challengeTargetsFrom(state, r, c, cell.owner, cell.type);
+  if (isRestricted(state, r, c)) {
+    state.moveTargets = [];
+    state.challengeTargets = state.restrictedUnitChallenged ? [] : challengeTargetsFrom(state, r, c, cell.owner, cell.type);
+  } else {
+    state.moveTargets = moveTargetsFrom(state, r, c, cell.owner, cell.type);
+    state.challengeTargets = challengeTargetsFrom(state, r, c, cell.owner, cell.type);
+  }
   return { ok: true };
 }
 
@@ -216,6 +214,7 @@ function clearSelection(state) {
 function moveUnit(state, tr, tc) {
   if (state.phase !== "segment" || !state.selected) return { ok: false, reason: "対象外です" };
   const [r, c] = state.selected;
+  if (isRestricted(state, r, c)) return { ok: false, reason: "配置直後は移動できません" };
   const legal = state.moveTargets.some(([mr, mc]) => mr === tr && mc === tc);
   if (!legal) return { ok: false, reason: "その移動は不正です" };
   const cell = state.board[r][c];
@@ -234,11 +233,20 @@ function challengeUnit(state, tr, tc) {
   const [r, c] = state.selected;
   const legal = state.challengeTargets.some(([cr, cc]) => cr === tr && cc === tc);
   if (!legal) return { ok: false, reason: "挑戦できません" };
+  if (isRestricted(state, r, c)) state.restrictedUnitChallenged = true;
   resolveChallenge(state, r, c, tr, tc);
   state.segmentActionCount += 1;
   clearSelection(state);
-  if (!state.winner) checkAutoEndTurn(state);
+  if (!state.winner) checkSegmentAutoAdvance(state);
   return { ok: true };
+}
+
+// 行動後、現在の担当者に行動可能な手が一つも残っていなければ、自動的にセグメントを終える
+function checkSegmentAutoAdvance(state) {
+  if (state.phase !== "segment") return;
+  if (!hasAnyAction(state, state.activePlayer)) {
+    passSegment(state);
+  }
 }
 
 function resolveChallenge(state, ar, ac, br, bc) {
@@ -295,6 +303,10 @@ function hasAnyAction(state, owner) {
     for (let c = 0; c < SIZE; c++) {
       const cell = state.board[r][c];
       if (!cell || cell.kind !== "unit" || cell.owner !== owner) continue;
+      if (isRestricted(state, r, c)) {
+        if (!state.restrictedUnitChallenged && challengeTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
+        continue; // 配置直後のユニットは移動できない
+      }
       if (challengeTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
       if (moveTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
     }
@@ -302,14 +314,7 @@ function hasAnyAction(state, owner) {
   return false;
 }
 
-function checkAutoEndTurn(state) {
-  if (state.phase !== "segment") return;
-  if (!hasAnyAction(state, "jjy") && !hasAnyAction(state, "zzg")) {
-    pushLog(state, "両者とも行動不能のため、ターン自動終了。");
-    endTurn(state);
-  }
-}
-
+// 自分のセグメントを終える（できることが無いための自動終了も、宣言したものとして扱う）
 function passSegment(state) {
   if (state.phase !== "segment") return { ok: false };
   const endedEmpty = state.segmentActionCount === 0;
@@ -320,10 +325,7 @@ function passSegment(state) {
   }
   pushLog(state, `${state.activePlayer} がセグメント終了を宣言。`);
   state.prevSegmentEndedEmpty = endedEmpty;
-  state.activePlayer = otherPlayer(state.activePlayer);
-  state.segmentActionCount = 0;
-  clearSelection(state);
-  checkAutoEndTurn(state);
+  enterSegment(state, otherPlayer(state.activePlayer));
   return { ok: true };
 }
 
@@ -382,8 +384,6 @@ window.JangJiYargar = {
   canPlace,
   emptyCells,
   placeUnit,
-  placementChallenge,
-  skipPlacementChallenge,
   selectUnit,
   clearSelection,
   moveUnit,
