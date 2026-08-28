@@ -1,0 +1,15 @@
+/* units_sprite.png: 3 columns (rock/scissors/paper) x 2 rows (jjy/zzg), 200x200px per cell */
+.unit-icon {
+  display: inline-block;
+  width: 200px;
+  height: 200px;
+  background-image: url("units_sprite.png");
+  background-repeat: no-repeat;
+}
+
+.unit-jjy-rock     { background-position: 0px 0px; }
+.unit-jjy-scissors { background-position: -200px 0px; }
+.unit-jjy-paper    { background-position: -400px 0px; }
+.unit-zzg-rock     { background-position: 0px -200px; }
+.unit-zzg-scissors { background-position: -200px -200px; }
+.unit-zzg-paper    { background-position: -400px -200px; }

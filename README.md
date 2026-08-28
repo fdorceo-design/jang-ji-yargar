@@ -1,5 +1,7 @@
 # Jang-Ji-Yargar
 
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
 ![Jang-Ji-Yargar](./Jang-Ji-Yargar.png)
 
 ## 序
@@ -59,6 +61,13 @@
 
 ユニット固有の方向と距離は、移動と攻撃の両方に共通して適用されます。
 
+### ユニット画像
+
+各ユニットのアイコン画像は [assets/units/](./assets/units/) に配置しています。HTML組み込み用に、6種のアイコン（グー・チョキ・パー × Jang-Ji-Yargar陣営・Zung-Zoo-Gar陣営）を1枚にまとめたスプライトシートも用意しています。
+
+- [units_sprite.png](./assets/units/units_sprite.png) — 3列（グー・チョキ・パー）× 2行（Jang-Ji-Yargar陣営・Zung-Zoo-Gar陣営）、各200×200pxのスプライトシート
+- [units_sprite.css](./assets/units/units_sprite.css) — `background-position` によるクラス定義（`.unit-jjy-rock` など）
+
 ## 基本的な勝敗
 
 ### 通常勝利
@@ -111,10 +120,18 @@
 
 5×5盤、敗者位置の固定陣地化、ユニット固有の移動、交互セグメント、連鎖戦闘、グーの通算制限などを加え、別のゲーム構造として設計しています。
 
+## 画像について
+
+本リポジトリ内の画像素材（カバーアート、ユニットアイコン等）はAI画像生成ツールを用いて制作しています。
+
+## ライセンス
+
+本リポジトリのルール文書・README・画像は [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) の下で公開しています。詳細は [LICENSE.md](./LICENSE.md) を参照してください。
+
 ## 開発状況
 
 - ルール：v0.1
-- コマ画像：制作中
+- コマ画像：完成（[assets/units/](./assets/units/)）
 - 盤面・UI：検討中
 - プレイテスト：これから
 
@@ -125,3 +142,5 @@
 ### English summary
 
 **Jang-Ji-Yargar** is a two-player, perfect-information abstract strategy game played on a 5×5 board. Players deploy rock, scissors, and paper units with distinct movement and attack directions. A defeated unit disappears, and its square becomes a permanent territory marker belonging to the winner. The first player to connect three of their territory markers vertically, horizontally, or diagonally wins.
+
+Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see [LICENSE.md](./LICENSE.md).
