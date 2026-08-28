@@ -79,6 +79,8 @@ function startTurn(state) {
   }
   state.phase = "placement";
   state.activePlayer = state.turnOwner;
+  state.placementQuota = state.turnNumber === 1 ? 2 : 1;
+  state.placementsDone = 0;
   state.placedPos = null;
   state.pendingChallengeTargets = [];
   state.selected = null;
@@ -91,6 +93,7 @@ function startTurn(state) {
 
 function canPlace(state, type) {
   if (state.phase !== "placement") return false;
+  if (state.placedPos !== null) return false;
   if (type === "rock" && state.players[state.activePlayer].rockUsed >= ROCK_MAX) return false;
   return true;
 }
@@ -138,12 +141,13 @@ function placeUnit(state, type, r, c) {
   state.board[r][c] = { kind: "unit", owner, type };
   if (type === "rock") state.players[owner].rockUsed += 1;
   state.placedPos = [r, c];
+  state.placementsDone += 1;
   pushLog(state, `${owner} が ${type} を (${r},${c}) へ配置`);
 
   const targets = challengeTargetsFrom(state, r, c, owner, type);
   state.pendingChallengeTargets = targets;
   if (targets.length === 0) {
-    endPlacementPhase(state);
+    advanceOrEndPlacement(state);
   }
   return { ok: true };
 }
@@ -155,14 +159,24 @@ function placementChallenge(state, tr, tc) {
   const [r, c] = state.placedPos;
   resolveChallenge(state, r, c, tr, tc);
   if (state.winner) return { ok: true };
-  endPlacementPhase(state);
+  advanceOrEndPlacement(state);
   return { ok: true };
 }
 
 function skipPlacementChallenge(state) {
   if (state.phase !== "placement") return { ok: false, reason: "対象外です" };
-  endPlacementPhase(state);
+  advanceOrEndPlacement(state);
   return { ok: true };
+}
+
+// 配置番の残り数に応じて、続けて配置させるかセグメントを終えるかを決める
+function advanceOrEndPlacement(state) {
+  if (state.placementsDone < state.placementQuota) {
+    state.placedPos = null;
+    state.pendingChallengeTargets = [];
+    return;
+  }
+  endPlacementPhase(state);
 }
 
 function endPlacementPhase(state) {

@@ -217,9 +217,11 @@ function render() {
   turnAvatarEl.style.backgroundImage = `url('assets/markers/marker_${owner}_win_01.png')`;
   turnTextEl.textContent = `ターン${game.turnNumber} — ${NAMES[owner]}陣営`;
   if (game.phase === "placement") {
+    const remainingPlacements = game.placementQuota - game.placementsDone;
+    const quotaNote = game.placementQuota > 1 ? `（あと${remainingPlacements}体）` : "";
     turnPhaseEl.textContent = game.placedPos
       ? "第1セグメント：配置後の挑戦を選択"
-      : "第1セグメント：ユニットを配置してください";
+      : `第1セグメント：ユニットを配置してください${quotaNote}`;
   } else if (game.phase === "segment") {
     turnPhaseEl.textContent = "通常セグメント：移動・挑戦、または相手へ渡す";
   } else if (game.phase === "ended") {
