@@ -27,6 +27,58 @@ const BEATS = { rock: "scissors", scissors: "paper", paper: "rock" };
 
 const ROCK_MAX = 5;
 
+// 45度刻みの8方向リング（画面上で時計回りが正の方向）
+const DIR_RING = [
+  [-1, 0], // N
+  [-1, 1], // NE
+  [0, 1], // E
+  [1, 1], // SE
+  [1, 0], // S
+  [1, -1], // SW
+  [0, -1], // W
+  [-1, -1], // NW
+];
+
+function ringIndexOf(dir) {
+  return DIR_RING.findIndex(([dr, dc]) => dr === dir[0] && dc === dir[1]);
+}
+
+// dir を 45度 x steps だけ回転させる（steps>0: 時計回り, steps<0: 反時計回り）
+function rotateDir(dir, steps) {
+  const idx = ringIndexOf(dir);
+  const next = (((idx + steps) % 8) + 8) % 8;
+  return DIR_RING[next];
+}
+
+function rotateDirs(dirs, steps) {
+  return dirs.map((d) => rotateDir(d, steps));
+}
+
+// 回転数カウンタの通算上限
+const ROTATION_MAX = { rock45: 1, sp45: 2, sp90: 4 };
+
+// (type, kind) から回転後の方向の組を得る
+function rotatedDirsFor(type, kind) {
+  const base = UNIT_DIRS[type];
+  if (kind === "rock45") return rotateDirs(base, 1);
+  if (kind === "sp45cw") return rotateDirs(base, 1);
+  if (kind === "sp45ccw") return rotateDirs(base, -1);
+  if (kind === "sp90") return rotateDirs(base, 2);
+  return base;
+}
+
+// 回転の種類から、どの回転数カウンタを消費するか
+function rotationChargeField(kind) {
+  if (kind === "rock45") return "rock45";
+  return kind === "sp90" ? "sp90" : "sp45";
+}
+
+// そのユニット種類が使える回転の種類一覧
+function rotationKindsForType(type) {
+  if (type === "rock") return ["rock45"];
+  return ["sp45cw", "sp45ccw", "sp90"];
+}
+
 function otherPlayer(p) {
   return p === "jjy" ? "zzg" : "jjy";
 }
@@ -39,8 +91,8 @@ function createGame() {
   const state = {
     board: Array.from({ length: SIZE }, () => Array(SIZE).fill(null)),
     players: {
-      jjy: { rockUsed: 0 },
-      zzg: { rockUsed: 0 },
+      jjy: { rockUsed: 0, rotUsed: { rock45: 0, sp45: 0, sp90: 0 } },
+      zzg: { rockUsed: 0, rotUsed: { rock45: 0, sp45: 0, sp90: 0 } },
     },
     turnOwner: "jjy",
     turnNumber: 1,
@@ -50,6 +102,8 @@ function createGame() {
     selected: null,
     moveTargets: [],
     challengeTargets: [],
+    rotationKind: null,
+    rotationMoveTargets: [],
     segmentActionCount: 0,
     hasPriorSegmentThisTurn: false,
     // このターンに配置したユニットの座標。ターン担当者の最初の通常セグメントの間だけ、移動不可・挑戦は最大1回の制限を受ける
@@ -86,6 +140,8 @@ function startTurn(state) {
   state.selected = null;
   state.moveTargets = [];
   state.challengeTargets = [];
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
   state.segmentActionCount = 0;
   state.hasPriorSegmentThisTurn = false;
   state.restrictedUnitPos = null;
@@ -118,10 +174,10 @@ function emptyCells(state) {
   return cells;
 }
 
-// pos の unit(owner,type) が挑戦可能な敵ユニット座標一覧
-function challengeTargetsFrom(state, r, c, owner, type) {
+// pos から dirs の方向で挑戦可能な敵ユニット座標一覧
+function challengeTargetsFromDirs(state, r, c, owner, type, dirs) {
   const targets = [];
-  for (const [dr, dc] of UNIT_DIRS[type]) {
+  for (const [dr, dc] of dirs) {
     const nr = r + dr,
       nc = c + dc;
     if (!inBounds(nr, nc)) continue;
@@ -131,6 +187,24 @@ function challengeTargetsFrom(state, r, c, owner, type) {
     }
   }
   return targets;
+}
+
+// pos の unit(owner,type) が挑戦可能な敵ユニット座標一覧（通常の方向）
+function challengeTargetsFrom(state, r, c, owner, type) {
+  return challengeTargetsFromDirs(state, r, c, owner, type, UNIT_DIRS[type]);
+}
+
+function uniqueCoords(list) {
+  const seen = new Set();
+  const out = [];
+  for (const [r, c] of list) {
+    const key = r + "," + c;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push([r, c]);
+    }
+  }
+  return out;
 }
 
 // pos の unit が移動可能な座標一覧（移動後に挑戦可能になる場合のみ）
@@ -145,6 +219,36 @@ function moveTargetsFrom(state, r, c, owner, type) {
     if (afterTargets.length > 0) moves.push([nr, nc]);
   }
   return moves;
+}
+
+// pos の unit が種類 kind の回転移動で移動可能な座標一覧。
+// 移動先から、回転後の方向・通常の方向のいずれかで挑戦できる敵がいることが条件（rule 8）。
+function rotatedMoveTargetsFrom(state, r, c, owner, type, kind) {
+  const rotDirs = rotatedDirsFor(type, kind);
+  const moves = [];
+  for (const [dr, dc] of rotDirs) {
+    const nr = r + dr,
+      nc = c + dc;
+    if (!inBounds(nr, nc)) continue;
+    if (state.board[nr][nc] !== null) continue; // 空きマスのみ
+    const rotTargets = challengeTargetsFromDirs(state, nr, nc, owner, type, rotDirs);
+    const normalTargets = challengeTargetsFrom(state, nr, nc, owner, type);
+    if (rotTargets.length > 0 || normalTargets.length > 0) moves.push([nr, nc]);
+  }
+  return moves;
+}
+
+// r,c のユニットが今使える回転の種類一覧（種類・残り回数・制限状態を考慮）
+function availableRotationKinds(state, r, c) {
+  if (state.phase !== "segment") return [];
+  const cell = state.board[r][c];
+  if (!cell || cell.kind !== "unit" || cell.owner !== state.activePlayer) return [];
+  if (isRestricted(state, r, c)) return [];
+  const kinds = rotationKindsForType(cell.type);
+  return kinds.filter((kind) => {
+    const field = rotationChargeField(kind);
+    return state.players[cell.owner].rotUsed[field] < ROTATION_MAX[field];
+  });
 }
 
 function placeUnit(state, type, r, c) {
@@ -192,6 +296,8 @@ function enterSegment(state, player) {
 function selectUnit(state, r, c) {
   if (state.phase !== "segment") return { ok: false };
   const cell = state.board[r][c];
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
   if (!cell || cell.kind !== "unit" || cell.owner !== state.activePlayer) {
     state.selected = null;
     state.moveTargets = [];
@@ -213,6 +319,8 @@ function clearSelection(state) {
   state.selected = null;
   state.moveTargets = [];
   state.challengeTargets = [];
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
 }
 
 function moveUnit(state, tr, tc) {
@@ -229,6 +337,55 @@ function moveUnit(state, tr, tc) {
   state.selected = [tr, tc];
   state.moveTargets = [];
   state.challengeTargets = challengeTargetsFrom(state, tr, tc, cell.owner, cell.type);
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
+  return { ok: true };
+}
+
+// 選んだユニットについて、種類 kind の回転移動のプレビュー（移動先候補）を表示する
+function previewRotation(state, kind) {
+  if (state.phase !== "segment" || !state.selected) return { ok: false, reason: "対象外です" };
+  const [r, c] = state.selected;
+  const available = availableRotationKinds(state, r, c);
+  if (!available.includes(kind)) return { ok: false, reason: "その回転は使えません" };
+  const cell = state.board[r][c];
+  const targets = rotatedMoveTargetsFrom(state, r, c, cell.owner, cell.type, kind);
+  state.rotationKind = kind;
+  state.rotationMoveTargets = targets;
+  return { ok: true };
+}
+
+function cancelRotationPreview(state) {
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
+}
+
+// 回転移動を実行する（previewRotation で選んだ kind を使用）
+function rotateMoveUnit(state, tr, tc) {
+  if (state.phase !== "segment" || !state.selected || !state.rotationKind) {
+    return { ok: false, reason: "対象外です" };
+  }
+  const [r, c] = state.selected;
+  const kind = state.rotationKind;
+  if (isRestricted(state, r, c)) return { ok: false, reason: "配置直後は回転移動できません" };
+  const legal = state.rotationMoveTargets.some(([mr, mc]) => mr === tr && mc === tc);
+  if (!legal) return { ok: false, reason: "その回転移動は不正です" };
+  const cell = state.board[r][c];
+  const field = rotationChargeField(kind);
+  state.players[cell.owner].rotUsed[field] += 1;
+  state.board[r][c] = null;
+  state.board[tr][tc] = cell;
+  pushLog(state, `${cell.owner} の ${cell.type} が回転移動(${kind})で (${r},${c})→(${tr},${tc})`);
+  state.segmentActionCount += 1;
+  state.selected = [tr, tc];
+  state.moveTargets = [];
+  state.rotationKind = null;
+  state.rotationMoveTargets = [];
+  // 挑戦は「回転した方向」「通常の方向」のいずれでも良い（rule 8）
+  const rotDirs = rotatedDirsFor(cell.type, kind);
+  const rotTargets = challengeTargetsFromDirs(state, tr, tc, cell.owner, cell.type, rotDirs);
+  const normalTargets = challengeTargetsFrom(state, tr, tc, cell.owner, cell.type);
+  state.challengeTargets = uniqueCoords([...rotTargets, ...normalTargets]);
   return { ok: true };
 }
 
@@ -313,6 +470,9 @@ function hasAnyAction(state, owner) {
       }
       if (challengeTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
       if (moveTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
+      for (const kind of availableRotationKinds(state, r, c)) {
+        if (rotatedMoveTargetsFrom(state, r, c, owner, cell.type, kind).length > 0) return true;
+      }
     }
   }
   return false;
@@ -387,6 +547,7 @@ window.JangJiYargar = {
   UNIT_DIRS,
   BEATS,
   ROCK_MAX,
+  ROTATION_MAX,
   createGame,
   canPlace,
   emptyCells,
@@ -398,5 +559,10 @@ window.JangJiYargar = {
   challengeUnit,
   passSegment,
   otherPlayer,
+  availableRotationKinds,
+  rotationChargeField,
+  previewRotation,
+  cancelRotationPreview,
+  rotateMoveUnit,
 };
 })();

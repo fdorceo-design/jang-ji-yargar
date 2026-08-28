@@ -137,6 +137,16 @@ h1 {
   }
 }
 
+.cell.highlight-rotate::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 6px;
+  background: rgba(120, 130, 255, 0.25);
+  border: 2px dashed rgba(140, 150, 255, 0.9);
+  pointer-events: none;
+}
+
 .cell.selected::before {
   content: "";
   position: absolute;
@@ -239,6 +249,28 @@ h1 {
 .tray-slot .count {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.rotation-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.rotation-panel button {
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  background: #1c2140;
+  border-color: #3a4270;
+}
+
+.rotation-panel button:hover {
+  background: #262c56;
+}
+
+.rotation-panel button.active {
+  box-shadow: 0 0 0 2px #7c88ff;
 }
 
 .controls {

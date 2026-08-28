@@ -1,9 +1,32 @@
 (function () {
-const { createGame, canPlace, isRestricted, placeUnit, selectUnit, clearSelection, moveUnit, challengeUnit, passSegment, ROCK_MAX } = window.JangJiYargar;
+const {
+  createGame,
+  canPlace,
+  isRestricted,
+  placeUnit,
+  selectUnit,
+  clearSelection,
+  moveUnit,
+  challengeUnit,
+  passSegment,
+  ROCK_MAX,
+  ROTATION_MAX,
+  availableRotationKinds,
+  rotationChargeField,
+  previewRotation,
+  cancelRotationPreview,
+  rotateMoveUnit,
+} = window.JangJiYargar;
 
 const NAMES = { jjy: "Jang-Ji-Yargar", zzg: "Zung-Zoo-Gar" };
 const TYPE_LABELS = { rock: "グー", scissors: "チョキ", paper: "パー" };
 const TYPES = ["rock", "scissors", "paper"];
+const ROTATION_LABELS = {
+  rock45: "45°回転",
+  sp45cw: "45°回転（時計回り）",
+  sp45ccw: "45°回転（反時計回り）",
+  sp90: "90°回転",
+};
 
 const game = createGame();
 let uiSelectedTrayType = null;
@@ -13,6 +36,7 @@ const trayEl = document.getElementById("tray");
 const turnAvatarEl = document.getElementById("turn-avatar");
 const turnTextEl = document.getElementById("turn-text");
 const turnPhaseEl = document.getElementById("turn-phase");
+const rotationPanelEl = document.getElementById("rotation-panel");
 const passBtn = document.getElementById("pass-btn");
 const logEl = document.getElementById("log");
 const winBanner = document.getElementById("win-banner");
@@ -116,6 +140,11 @@ function handleCellClick(r, c) {
         render();
         return;
       }
+      if (game.rotationKind && cellHas(game.rotationMoveTargets, r, c)) {
+        rotateMoveUnit(game, r, c);
+        render();
+        return;
+      }
       if (cellHas(game.moveTargets, r, c)) {
         moveUnit(game, r, c);
         render();
@@ -137,6 +166,40 @@ passBtn.addEventListener("click", () => {
   render();
 });
 
+function handleRotationButtonClick(kind) {
+  if (game.rotationKind === kind) {
+    cancelRotationPreview(game);
+  } else {
+    previewRotation(game, kind);
+  }
+  render();
+}
+
+function renderRotationPanel() {
+  rotationPanelEl.innerHTML = "";
+  if (game.phase !== "segment" || !game.selected) {
+    rotationPanelEl.classList.add("hidden");
+    return;
+  }
+  const [r, c] = game.selected;
+  const cell = game.board[r][c];
+  const kinds = availableRotationKinds(game, r, c);
+  if (!cell || kinds.length === 0) {
+    rotationPanelEl.classList.add("hidden");
+    return;
+  }
+  rotationPanelEl.classList.remove("hidden");
+  for (const kind of kinds) {
+    const field = rotationChargeField(kind);
+    const remaining = ROTATION_MAX[field] - game.players[cell.owner].rotUsed[field];
+    const btn = document.createElement("button");
+    btn.textContent = `${ROTATION_LABELS[kind]}（残り${remaining}）`;
+    btn.classList.toggle("active", game.rotationKind === kind);
+    btn.addEventListener("click", () => handleRotationButtonClick(kind));
+    rotationPanelEl.appendChild(btn);
+  }
+}
+
 function render() {
   // board cells
   const cells = boardEl.children;
@@ -145,7 +208,7 @@ function render() {
       const idx = r * 5 + c;
       const cellEl = cells[idx];
       cellEl.innerHTML = "";
-      cellEl.classList.remove("highlight-place", "highlight-move", "highlight-challenge", "selected");
+      cellEl.classList.remove("highlight-place", "highlight-move", "highlight-rotate", "highlight-challenge", "selected");
 
       const boardCell = game.board[r][c];
       if (boardCell && boardCell.kind === "unit") {
@@ -173,10 +236,13 @@ function render() {
           cellEl.classList.add("selected");
         }
         if (cellHas(game.moveTargets, r, c)) cellEl.classList.add("highlight-move");
+        if (game.rotationKind && cellHas(game.rotationMoveTargets, r, c)) cellEl.classList.add("highlight-rotate");
         if (cellHas(game.challengeTargets, r, c)) cellEl.classList.add("highlight-challenge");
       }
     }
   }
+
+  renderRotationPanel();
 
   // tray
   const trayActive = game.phase === "placement";
