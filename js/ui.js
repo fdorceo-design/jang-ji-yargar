@@ -1,5 +1,5 @@
 (function () {
-const { createGame, canPlace, placeUnit, selectUnit, clearSelection, moveUnit, challengeUnit, passSegment, ROCK_MAX } = window.JangJiYargar;
+const { createGame, canPlace, isRestricted, placeUnit, selectUnit, clearSelection, moveUnit, challengeUnit, passSegment, ROCK_MAX } = window.JangJiYargar;
 
 const NAMES = { jjy: "Jang-Ji-Yargar", zzg: "Zung-Zoo-Gar" };
 const TYPE_LABELS = { rock: "グー", scissors: "チョキ", paper: "パー" };
@@ -151,7 +151,7 @@ function render() {
       if (boardCell && boardCell.kind === "unit") {
         const icon = document.createElement("div");
         icon.className = `unit-icon unit-${boardCell.owner}-${boardCell.type}`;
-        const canDrag = game.phase === "segment" && boardCell.owner === game.activePlayer;
+        const canDrag = game.phase === "segment" && boardCell.owner === game.activePlayer && !isRestricted(game, r, c);
         icon.draggable = canDrag;
         if (canDrag) {
           icon.addEventListener("dragstart", (e) => handleUnitDragStart(e, r, c));

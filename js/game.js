@@ -51,7 +51,7 @@ function createGame() {
     moveTargets: [],
     challengeTargets: [],
     segmentActionCount: 0,
-    prevSegmentEndedEmpty: false,
+    hasPriorSegmentThisTurn: false,
     // このターンに配置したユニットの座標。ターン担当者の最初の通常セグメントの間だけ、移動不可・挑戦は最大1回の制限を受ける
     restrictedUnitPos: null,
     restrictedUnitChallenged: false,
@@ -87,7 +87,7 @@ function startTurn(state) {
   state.moveTargets = [];
   state.challengeTargets = [];
   state.segmentActionCount = 0;
-  state.prevSegmentEndedEmpty = false;
+  state.hasPriorSegmentThisTurn = false;
   state.restrictedUnitPos = null;
   state.restrictedUnitChallenged = false;
   state.turnOwnerSegmentCount = 0;
@@ -319,16 +319,19 @@ function hasAnyAction(state, owner) {
 }
 
 // 自分のセグメントを終える（できることが無いための自動終了も、宣言したものとして扱う）
+// 「行動を挟まずに続けて終了を宣言」＝今終えるこのセグメントに行動が無く、かつ
+// このセグメントの直前にも（このターン中に）別の終了宣言があったこと。
+// 直前のセグメント自体に行動があったかどうかは関係ない。
 function passSegment(state) {
   if (state.phase !== "segment") return { ok: false };
   const endedEmpty = state.segmentActionCount === 0;
-  if (endedEmpty && state.prevSegmentEndedEmpty) {
+  if (endedEmpty && state.hasPriorSegmentThisTurn) {
     pushLog(state, "両者が連続して終了を宣言。ターン終了。");
     endTurn(state);
     return { ok: true };
   }
   pushLog(state, `${state.activePlayer} がセグメント終了を宣言。`);
-  state.prevSegmentEndedEmpty = endedEmpty;
+  state.hasPriorSegmentThisTurn = true;
   enterSegment(state, otherPlayer(state.activePlayer));
   return { ok: true };
 }
@@ -387,6 +390,7 @@ window.JangJiYargar = {
   createGame,
   canPlace,
   emptyCells,
+  isRestricted,
   placeUnit,
   selectUnit,
   clearSelection,
