@@ -169,6 +169,10 @@ function placeUnit(state, type, r, c) {
     state.restrictedUnitPos = [r, c];
     state.restrictedUnitChallenged = false;
     enterSegment(state, state.turnOwner);
+    // セグメントが自動終了していなければ、配置したユニットを自動選択し、挑戦対象をすぐ確認できるようにする
+    if (state.phase === "segment" && state.activePlayer === state.turnOwner) {
+      selectUnit(state, r, c);
+    }
   }
   return { ok: true };
 }
