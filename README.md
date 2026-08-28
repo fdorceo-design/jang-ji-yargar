@@ -1,8 +1,8 @@
 # Jang-Ji-Yargar
 
-## 序
-
 ![Jang-Ji-Yargar](./Jang-Ji-Yargar.png)
+
+## 序
 
 > 遥か昔。  
 > 遠い宇宙の、遥か彼方。  
@@ -20,6 +20,10 @@
 > その戦術を後世へ伝えるために作られた盤上遊戯。
 >
 > それが――**ジャンジャガ**である。
+
+![Zung-Zoo-Gar](./Zung-Zoo-Gar.png)
+
+<p align="center"><sub>宿敵・Zung-Zoo-Gar</sub></p>
 
 ## ジャンジャガ
 
