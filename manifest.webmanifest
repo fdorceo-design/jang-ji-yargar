@@ -1,0 +1,21 @@
+{
+  "name": "ジャンジャガ (Jang-Ji-Yargar)",
+  "short_name": "ジャンジャガ",
+  "description": "じゃんけん連鎖と不可逆陣地を組み合わせた、5×5の2人対戦アブストラクトゲーム。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    {
+      "src": "assets/branding/icon_jang_ji_yargar_192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/branding/icon_jang_ji_yargar_512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

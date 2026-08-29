@@ -80,15 +80,22 @@ def main():
         raise RuntimeError("unpatched asset path remains in game.js")
     ui_js = patch_ui_js((ROOT / "js" / "ui.js").read_text(encoding="utf-8"))
 
+    # manifest / OGP・Twitterカードは、実際にホスティングされたURLがあって初めて意味を持つ。
+    # 単体ファイルには当てはまらないため、standalone版では取り除く。
+    html = re.sub(r'\n<link rel="manifest"[^>]*/>', "", html)
+    html = re.sub(r'\n<meta property="og:[^>]*/>', "", html)
+    html = re.sub(r'\n<meta name="twitter:[^>]*/>', "", html)
+
     html = html.replace(
         '<link rel="stylesheet" href="style.css" />',
         f"<style>\n{css}\n</style>",
     )
 
     def img_repl(m):
-        return f'src="{data_uri(m.group(1))}"'
+        attr = m.group(1)
+        return f'{attr}="{data_uri(m.group(2))}"'
 
-    html = re.sub(r'src="(assets/[^"]+)"', img_repl, html)
+    html = re.sub(r'(src|href)="(assets/[^"]+)"', img_repl, html)
 
     html = html.replace(
         '<script src="js/game.js"></script>\n<script src="js/ui.js"></script>',
