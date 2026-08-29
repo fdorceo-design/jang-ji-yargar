@@ -16,6 +16,7 @@ const {
   previewRotation,
   cancelRotationPreview,
   rotateMoveUnit,
+  countMarks,
 } = window.JangJiYargar;
 
 const NAMES = { jjy: "Jang-Ji-Yargar", zzg: "Zung-Zoo-Gar" };
@@ -50,6 +51,17 @@ const turnAvatarEl = document.getElementById("turn-avatar");
 const turnTextEl = document.getElementById("turn-text");
 const turnPhaseEl = document.getElementById("turn-phase");
 const rotationPanelEl = document.getElementById("rotation-panel");
+const countersEl = {
+  jMarks: document.getElementById("cnt-j-marks"),
+  jRock45: document.getElementById("cnt-j-rock45"),
+  jSp90: document.getElementById("cnt-j-sp90"),
+  jSp45: document.getElementById("cnt-j-sp45"),
+  turn: document.getElementById("cnt-turn"),
+  zSp45: document.getElementById("cnt-z-sp45"),
+  zSp90: document.getElementById("cnt-z-sp90"),
+  zRock45: document.getElementById("cnt-z-rock45"),
+  zMarks: document.getElementById("cnt-z-marks"),
+};
 const passBtn = document.getElementById("pass-btn");
 const logEl = document.getElementById("log");
 const winBanner = document.getElementById("win-banner");
@@ -196,6 +208,18 @@ function handleRotationButtonClick(kind, mode) {
   render();
 }
 
+function renderCountersBar() {
+  countersEl.jMarks.textContent = countMarks(game, "jjy");
+  countersEl.jRock45.textContent = ROTATION_MAX.rock45 - game.players.jjy.rotUsed.rock45;
+  countersEl.jSp90.textContent = ROTATION_MAX.sp90 - game.players.jjy.rotUsed.sp90;
+  countersEl.jSp45.textContent = ROTATION_MAX.sp45 - game.players.jjy.rotUsed.sp45;
+  countersEl.turn.textContent = game.turnNumber;
+  countersEl.zSp45.textContent = ROTATION_MAX.sp45 - game.players.zzg.rotUsed.sp45;
+  countersEl.zSp90.textContent = ROTATION_MAX.sp90 - game.players.zzg.rotUsed.sp90;
+  countersEl.zRock45.textContent = ROTATION_MAX.rock45 - game.players.zzg.rotUsed.rock45;
+  countersEl.zMarks.textContent = countMarks(game, "zzg");
+}
+
 const MODE_PREFIX = { moveRotated: "回転移動", challengeRotated: "回転挑戦" };
 
 function renderRotationPanel() {
@@ -268,6 +292,7 @@ function render() {
   }
 
   renderRotationPanel();
+  renderCountersBar();
 
   // tray
   const trayActive = game.phase === "placement";

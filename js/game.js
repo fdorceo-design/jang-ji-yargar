@@ -589,5 +589,6 @@ window.JangJiYargar = {
   previewRotation,
   cancelRotationPreview,
   rotateMoveUnit,
+  countMarks,
 };
 })();
