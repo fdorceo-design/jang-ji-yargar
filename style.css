@@ -35,6 +35,13 @@ h1 {
   letter-spacing: 0.1em;
 }
 
+h1.logo img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
 .turn-bar {
   display: flex;
   align-items: center;
