@@ -315,7 +315,7 @@ function render() {
   // turn bar
   const owner = game.activePlayer;
   turnAvatarEl.className = `turn-avatar ${owner}`;
-  turnAvatarEl.style.backgroundImage = `url('assets/markers/marker_${owner}_win_01.png')`;
+  turnAvatarEl.style.backgroundImage = `url('assets/markers/marker_${owner}_win_01.jpg')`;
   turnTextEl.textContent = `ターン${game.turnNumber} — ${NAMES[owner]}陣営`;
   if (game.phase === "placement") {
     const remainingPlacements = game.placementQuota - game.placementsDone;
@@ -342,7 +342,7 @@ function render() {
       winText.textContent = "引き分け";
     } else {
       winAvatar.style.display = "block";
-      winAvatar.style.backgroundImage = `url('assets/markers/marker_${game.winner}_win_01.png')`;
+      winAvatar.style.backgroundImage = `url('assets/markers/marker_${game.winner}_win_01.jpg')`;
       winText.textContent = `${NAMES[game.winner]} 陣営の勝利`;
     }
   } else {

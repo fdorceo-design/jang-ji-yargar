@@ -195,13 +195,13 @@ h1 {
 }
 
 .mark.jjy {
-  background-image: url("assets/markers/marker_jjy_win_01.png");
+  background-image: url("assets/markers/marker_jjy_win_01.jpg");
   border: 3px solid var(--jjy-color);
   box-shadow: 0 0 8px 1px rgba(192, 57, 43, 0.7);
 }
 
 .mark.zzg {
-  background-image: url("assets/markers/marker_zzg_win_01.png");
+  background-image: url("assets/markers/marker_zzg_win_01.jpg");
   border: 3px solid var(--zzg-color);
   box-shadow: 0 0 8px 1px rgba(22, 165, 150, 0.7);
 }
