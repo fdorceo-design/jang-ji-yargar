@@ -103,6 +103,7 @@ function createGame() {
     moveTargets: [],
     challengeTargets: [],
     rotationKind: null,
+    rotationMode: null,
     rotationMoveTargets: [],
     segmentActionCount: 0,
     hasPriorSegmentThisTurn: false,
@@ -141,6 +142,7 @@ function startTurn(state) {
   state.moveTargets = [];
   state.challengeTargets = [];
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
   state.segmentActionCount = 0;
   state.hasPriorSegmentThisTurn = false;
@@ -221,19 +223,27 @@ function moveTargetsFrom(state, r, c, owner, type) {
   return moves;
 }
 
-// pos の unit が種類 kind の回転移動で移動可能な座標一覧。
-// 移動先から、回転後の方向・通常の方向のいずれかで挑戦できる敵がいることが条件（rule 8）。
-function rotatedMoveTargetsFrom(state, r, c, owner, type, kind) {
+// pos の unit が種類 kind・モード mode の回転行動で移動可能な座標一覧（rule 8）。
+// mode "moveRotated"（回転後に移動する場合）：移動方向が回転後の方向。
+//   移動先から、回転後の方向・通常の方向のいずれかで挑戦できれば良い。
+// mode "challengeRotated"（通常移動後に回転する場合）：移動方向は通常のまま。
+//   移動先から、回転後の方向で挑戦できることが必要。
+function rotationActionTargets(state, r, c, owner, type, kind, mode) {
   const rotDirs = rotatedDirsFor(type, kind);
+  const moveDirs = mode === "moveRotated" ? rotDirs : UNIT_DIRS[type];
   const moves = [];
-  for (const [dr, dc] of rotDirs) {
+  for (const [dr, dc] of moveDirs) {
     const nr = r + dr,
       nc = c + dc;
     if (!inBounds(nr, nc)) continue;
     if (state.board[nr][nc] !== null) continue; // 空きマスのみ
     const rotTargets = challengeTargetsFromDirs(state, nr, nc, owner, type, rotDirs);
-    const normalTargets = challengeTargetsFrom(state, nr, nc, owner, type);
-    if (rotTargets.length > 0 || normalTargets.length > 0) moves.push([nr, nc]);
+    if (mode === "moveRotated") {
+      const normalTargets = challengeTargetsFrom(state, nr, nc, owner, type);
+      if (rotTargets.length > 0 || normalTargets.length > 0) moves.push([nr, nc]);
+    } else {
+      if (rotTargets.length > 0) moves.push([nr, nc]);
+    }
   }
   return moves;
 }
@@ -297,6 +307,7 @@ function selectUnit(state, r, c) {
   if (state.phase !== "segment") return { ok: false };
   const cell = state.board[r][c];
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
   if (!cell || cell.kind !== "unit" || cell.owner !== state.activePlayer) {
     state.selected = null;
@@ -320,6 +331,7 @@ function clearSelection(state) {
   state.moveTargets = [];
   state.challengeTargets = [];
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
 }
 
@@ -338,54 +350,66 @@ function moveUnit(state, tr, tc) {
   state.moveTargets = [];
   state.challengeTargets = challengeTargetsFrom(state, tr, tc, cell.owner, cell.type);
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
   return { ok: true };
 }
 
-// 選んだユニットについて、種類 kind の回転移動のプレビュー（移動先候補）を表示する
-function previewRotation(state, kind) {
+// 選んだユニットについて、種類 kind・モード mode の回転行動のプレビュー（移動先候補）を表示する。
+// mode: "moveRotated"（回転後に移動） | "challengeRotated"（通常移動後に回転）
+function previewRotation(state, kind, mode) {
   if (state.phase !== "segment" || !state.selected) return { ok: false, reason: "対象外です" };
   const [r, c] = state.selected;
   const available = availableRotationKinds(state, r, c);
   if (!available.includes(kind)) return { ok: false, reason: "その回転は使えません" };
   const cell = state.board[r][c];
-  const targets = rotatedMoveTargetsFrom(state, r, c, cell.owner, cell.type, kind);
+  const targets = rotationActionTargets(state, r, c, cell.owner, cell.type, kind, mode);
   state.rotationKind = kind;
+  state.rotationMode = mode;
   state.rotationMoveTargets = targets;
   return { ok: true };
 }
 
 function cancelRotationPreview(state) {
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
 }
 
-// 回転移動を実行する（previewRotation で選んだ kind を使用）
+// 回転行動を実行する（previewRotation で選んだ kind・mode を使用）
 function rotateMoveUnit(state, tr, tc) {
   if (state.phase !== "segment" || !state.selected || !state.rotationKind) {
     return { ok: false, reason: "対象外です" };
   }
   const [r, c] = state.selected;
   const kind = state.rotationKind;
-  if (isRestricted(state, r, c)) return { ok: false, reason: "配置直後は回転移動できません" };
+  const mode = state.rotationMode;
+  if (isRestricted(state, r, c)) return { ok: false, reason: "配置直後は回転を使用できません" };
   const legal = state.rotationMoveTargets.some(([mr, mc]) => mr === tr && mc === tc);
-  if (!legal) return { ok: false, reason: "その回転移動は不正です" };
+  if (!legal) return { ok: false, reason: "その回転行動は不正です" };
   const cell = state.board[r][c];
   const field = rotationChargeField(kind);
   state.players[cell.owner].rotUsed[field] += 1;
   state.board[r][c] = null;
   state.board[tr][tc] = cell;
-  pushLog(state, `${cell.owner} の ${cell.type} が回転移動(${kind})で (${r},${c})→(${tr},${tc})`);
+  const modeLabel = mode === "moveRotated" ? "回転移動" : "回転挑戦";
+  pushLog(state, `${cell.owner} の ${cell.type} が${modeLabel}(${kind})で (${r},${c})→(${tr},${tc})`);
   state.segmentActionCount += 1;
   state.selected = [tr, tc];
   state.moveTargets = [];
   state.rotationKind = null;
+  state.rotationMode = null;
   state.rotationMoveTargets = [];
-  // 挑戦は「回転した方向」「通常の方向」のいずれでも良い（rule 8）
   const rotDirs = rotatedDirsFor(cell.type, kind);
   const rotTargets = challengeTargetsFromDirs(state, tr, tc, cell.owner, cell.type, rotDirs);
-  const normalTargets = challengeTargetsFrom(state, tr, tc, cell.owner, cell.type);
-  state.challengeTargets = uniqueCoords([...rotTargets, ...normalTargets]);
+  if (mode === "moveRotated") {
+    // 回転移動の場合、挑戦は「回転した方向」「通常の方向」のいずれでも良い
+    const normalTargets = challengeTargetsFrom(state, tr, tc, cell.owner, cell.type);
+    state.challengeTargets = uniqueCoords([...rotTargets, ...normalTargets]);
+  } else {
+    // 通常移動後の回転の場合、挑戦は宣言した回転方向のみ
+    state.challengeTargets = rotTargets;
+  }
   return { ok: true };
 }
 
@@ -471,7 +495,8 @@ function hasAnyAction(state, owner) {
       if (challengeTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
       if (moveTargetsFrom(state, r, c, owner, cell.type).length > 0) return true;
       for (const kind of availableRotationKinds(state, r, c)) {
-        if (rotatedMoveTargetsFrom(state, r, c, owner, cell.type, kind).length > 0) return true;
+        if (rotationActionTargets(state, r, c, owner, cell.type, kind, "moveRotated").length > 0) return true;
+        if (rotationActionTargets(state, r, c, owner, cell.type, kind, "challengeRotated").length > 0) return true;
       }
     }
   }

@@ -166,14 +166,16 @@ passBtn.addEventListener("click", () => {
   render();
 });
 
-function handleRotationButtonClick(kind) {
-  if (game.rotationKind === kind) {
+function handleRotationButtonClick(kind, mode) {
+  if (game.rotationKind === kind && game.rotationMode === mode) {
     cancelRotationPreview(game);
   } else {
-    previewRotation(game, kind);
+    previewRotation(game, kind, mode);
   }
   render();
 }
+
+const MODE_PREFIX = { moveRotated: "回転移動", challengeRotated: "回転挑戦" };
 
 function renderRotationPanel() {
   rotationPanelEl.innerHTML = "";
@@ -189,14 +191,16 @@ function renderRotationPanel() {
     return;
   }
   rotationPanelEl.classList.remove("hidden");
-  for (const kind of kinds) {
-    const field = rotationChargeField(kind);
-    const remaining = ROTATION_MAX[field] - game.players[cell.owner].rotUsed[field];
-    const btn = document.createElement("button");
-    btn.textContent = `${ROTATION_LABELS[kind]}（残り${remaining}）`;
-    btn.classList.toggle("active", game.rotationKind === kind);
-    btn.addEventListener("click", () => handleRotationButtonClick(kind));
-    rotationPanelEl.appendChild(btn);
+  for (const mode of ["moveRotated", "challengeRotated"]) {
+    for (const kind of kinds) {
+      const field = rotationChargeField(kind);
+      const remaining = ROTATION_MAX[field] - game.players[cell.owner].rotUsed[field];
+      const btn = document.createElement("button");
+      btn.textContent = `${MODE_PREFIX[mode]} ${ROTATION_LABELS[kind]}（残り${remaining}）`;
+      btn.classList.toggle("active", game.rotationKind === kind && game.rotationMode === mode);
+      btn.addEventListener("click", () => handleRotationButtonClick(kind, mode));
+      rotationPanelEl.appendChild(btn);
+    }
   }
 }
 
