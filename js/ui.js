@@ -28,6 +28,19 @@ const ROTATION_LABELS = {
   sp90: "90°回転",
 };
 
+const SOUNDS = {
+  place: new Audio("assets/sounds/se_place.mp3"),
+  rotate: new Audio("assets/sounds/se_rotate.mp3"),
+  explosion: new Audio("assets/sounds/se_explosion.mp3"),
+};
+
+function playSound(name) {
+  const base = SOUNDS[name];
+  if (!base) return;
+  const node = base.cloneNode();
+  node.play().catch(() => {});
+}
+
 const game = createGame();
 let uiSelectedTrayType = null;
 
@@ -115,10 +128,12 @@ function handleDrop(e, r, c) {
     return;
   }
   if (data.kind === "place") {
-    placeUnit(game, data.type, r, c);
+    const res = placeUnit(game, data.type, r, c);
+    if (res.ok) playSound("place");
     uiSelectedTrayType = null;
   } else if (data.kind === "move") {
-    moveUnit(game, r, c);
+    const res = moveUnit(game, r, c);
+    if (res.ok) playSound("place");
   }
   render();
 }
@@ -127,7 +142,10 @@ function handleCellClick(r, c) {
   if (game.phase === "placement") {
     if (uiSelectedTrayType && game.board[r][c] === null) {
       const res = placeUnit(game, uiSelectedTrayType, r, c);
-      if (res.ok) uiSelectedTrayType = null;
+      if (res.ok) {
+        uiSelectedTrayType = null;
+        playSound("place");
+      }
       render();
     }
     return;
@@ -136,17 +154,20 @@ function handleCellClick(r, c) {
   if (game.phase === "segment") {
     if (game.selected) {
       if (cellHas(game.challengeTargets, r, c)) {
-        challengeUnit(game, r, c);
+        const res = challengeUnit(game, r, c);
+        if (res.ok) playSound("explosion");
         render();
         return;
       }
       if (game.rotationKind && cellHas(game.rotationMoveTargets, r, c)) {
-        rotateMoveUnit(game, r, c);
+        const res = rotateMoveUnit(game, r, c);
+        if (res.ok) playSound("rotate");
         render();
         return;
       }
       if (cellHas(game.moveTargets, r, c)) {
-        moveUnit(game, r, c);
+        const res = moveUnit(game, r, c);
+        if (res.ok) playSound("place");
         render();
         return;
       }
